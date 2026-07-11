@@ -1,0 +1,11 @@
+.claude/
+
+# .NET / Visual Studio / Rider
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+.idea/
+.DS_Store
