@@ -1,12 +1,13 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NETpro.Labels;
 using NETpro.Models;
 using NETpro.Networking;
 
 namespace NETpro.ViewModels;
 
-public partial class MainViewModel(Func<Task<NetworkScanner>> scannerProvider) : ObservableObject
+public partial class MainViewModel(Func<Task<NetworkScanner>> scannerProvider, IDeviceLabelStore labelStore) : ObservableObject
 {
     public ObservableCollection<DeviceInfo> Devices { get; } = [];
 
@@ -35,7 +36,11 @@ public partial class MainViewModel(Func<Task<NetworkScanner>> scannerProvider) :
             {
                 case ScanResult.Success success:
                     Devices.Clear();
-                    foreach (var device in success.Devices) Devices.Add(device);
+                    foreach (var device in success.Devices)
+                    {
+                        AttachPersistedLabel(device);
+                        Devices.Add(device);
+                    }
                     ShowEmptyHint = success.Devices.Count == 1;
                     break;
                 case ScanResult.NoActiveNetwork:
@@ -59,4 +64,17 @@ public partial class MainViewModel(Func<Task<NetworkScanner>> scannerProvider) :
             HasScanned = true;
         }
     }
+
+    private void AttachPersistedLabel(DeviceInfo device)
+    {
+        var key = LabelKeyFor(device);
+        device.Label = labelStore.GetLabel(key) ?? (device.IsSelf ? "Este equipo" : string.Empty);
+        device.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(DeviceInfo.Label)) labelStore.SetLabel(key, device.Label);
+        };
+    }
+
+    private static string LabelKeyFor(DeviceInfo device) =>
+        device.IsSelf ? JsonFileDeviceLabelStore.SelfKey : device.MacAddress ?? device.IpAddress;
 }

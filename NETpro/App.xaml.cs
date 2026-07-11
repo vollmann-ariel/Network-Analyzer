@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using NETpro.Labels;
 using NETpro.Networking;
 using NETpro.Oui;
 using NETpro.ViewModels;
@@ -15,6 +16,8 @@ public partial class App : Application
         var networkInfoProvider = new SystemNetworkInfoProvider();
         var sweeper = new NetworkSweeper(new PingHostProber());
         var arpTableReader = new IpHlpApiArpTableReader();
+        var pingTimeMeasurer = new IcmpPingTimeMeasurer();
+        var labelStore = new JsonFileDeviceLabelStore();
 
         var vendorLookupTask = Task.Run(() =>
         {
@@ -23,9 +26,9 @@ public partial class App : Application
         });
 
         async Task<NetworkScanner> ScannerProvider() =>
-            new(networkInfoProvider, sweeper, arpTableReader, await vendorLookupTask);
+            new(networkInfoProvider, sweeper, arpTableReader, await vendorLookupTask, pingTimeMeasurer);
 
-        var viewModel = new MainViewModel(ScannerProvider);
+        var viewModel = new MainViewModel(ScannerProvider, labelStore);
         var mainWindow = new MainWindow { DataContext = viewModel };
         mainWindow.Show();
 

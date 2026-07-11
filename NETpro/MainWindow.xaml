@@ -34,14 +34,15 @@
 
         <DataGrid ItemsSource="{Binding Devices}"
                   AutoGenerateColumns="False"
-                  IsReadOnly="True"
+                  IsReadOnly="False"
                   CanUserAddRows="False"
                   GridLinesVisibility="Horizontal">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" Width="140" />
-                <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" Width="160" />
-                <DataGridTextColumn Header="Fabricante" Binding="{Binding Vendor}" Width="*" />
-                <DataGridCheckBoxColumn Header="Este equipo" Binding="{Binding IsSelf}" Width="90" />
+                <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" IsReadOnly="True" Width="130" />
+                <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" IsReadOnly="True" Width="150" />
+                <DataGridTextColumn Header="Fabricante" Binding="{Binding Vendor}" IsReadOnly="True" Width="*" />
+                <DataGridTextColumn Header="Ping" Binding="{Binding PingDisplay}" IsReadOnly="True" Width="90" />
+                <DataGridTextColumn Header="Referencia" Binding="{Binding Label}" Width="160" />
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>
