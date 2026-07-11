@@ -58,13 +58,17 @@ public sealed class NetworkScanner(
 
         var others = otherEntries
             .Select(e => new DeviceInfo(
-                e.IpAddress.ToString(), e.MacAddress, vendorLookup.Lookup(e.MacAddress),
-                isSelf: false, pingTimes.GetValueOrDefault(e.IpAddress)))
+                e.IpAddress.ToString(), e.MacAddress, vendorLookup.Lookup(e.MacAddress), isSelf: false)
+            {
+                PingTimeMs = pingTimes.GetValueOrDefault(e.IpAddress)
+            })
             .ToList();
 
         var self = new DeviceInfo(
-            info.IpAddress.ToString(), macAddress: null, vendor: null,
-            isSelf: true, pingTimes.GetValueOrDefault(info.IpAddress));
+            info.IpAddress.ToString(), macAddress: null, vendor: null, isSelf: true)
+        {
+            PingTimeMs = pingTimes.GetValueOrDefault(info.IpAddress)
+        };
 
         return new ScanResult.Success(new[] { self }.Concat(others).ToList());
     }
@@ -78,7 +82,7 @@ public sealed class NetworkScanner(
             await semaphore.WaitAsync(ct);
             try
             {
-                results[ip] = await pingTimeMeasurer.MeasureAverageRoundtripAsync(ip, PingSamplesPerDevice, ct);
+                results[ip] = await pingTimeMeasurer.MeasureAsync(ip, PingSamplesPerDevice, ct);
             }
             finally
             {

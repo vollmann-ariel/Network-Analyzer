@@ -89,4 +89,29 @@ public class MainViewModelTests
 
         Assert.Equal("Mi PC", vm2.Devices.Single(d => d.IsSelf).Label);
     }
+
+    [Fact]
+    public async Task RefreshCommand_KeepsPreviouslySeenDevice_WhenALaterScanDoesNotFindIt()
+    {
+        var scanCount = 0;
+        Task<NetworkScanner> Provider()
+        {
+            scanCount++;
+            IReadOnlyList<NeighborEntry> entries = scanCount == 1
+                ? [new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true)]
+                : [];
+            return Task.FromResult(new NetworkScanner(
+                new FakeNetworkInfoProvider(Info),
+                new NetworkSweeper(new NoOpHostProber()),
+                new FakeArpTableReader(entries),
+                new FakeOuiVendorLookup(),
+                new FakePingTimeMeasurer()));
+        }
+
+        var vm = new MainViewModel(Provider, new FakeDeviceLabelStore());
+        await vm.RefreshCommand.ExecuteAsync(null);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, vm.Devices.Count);
+    }
 }

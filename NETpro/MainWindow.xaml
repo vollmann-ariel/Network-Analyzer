@@ -17,6 +17,15 @@
                     Content="Actualizar"
                     Padding="12,4"
                     Command="{Binding RefreshCommand}" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
+                <CheckBox Content="Auto-actualizar cada"
+                          VerticalAlignment="Center"
+                          IsChecked="{Binding AutoRefreshEnabled}" />
+                <TextBox Width="40" Margin="4,0"
+                         VerticalAlignment="Center"
+                         Text="{Binding AutoRefreshIntervalSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Text="s" VerticalAlignment="Center" />
+            </StackPanel>
             <TextBlock Text="Dispositivos en la red local" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" />
         </DockPanel>
 
