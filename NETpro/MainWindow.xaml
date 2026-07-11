@@ -18,10 +18,10 @@
                     Padding="12,4"
                     Command="{Binding RefreshCommand}" />
             <Button DockPanel.Dock="Right"
-                    Content="Exportar CSV"
+                    Content="Exportar HTML"
                     Padding="12,4"
                     Margin="0,0,8,0"
-                    Click="OnExportCsvClick" />
+                    Click="OnExportHtmlClick" />
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
                 <CheckBox Content="Auto-actualizar cada"
                           VerticalAlignment="Center"

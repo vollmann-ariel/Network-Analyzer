@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -25,20 +24,17 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
-    private void OnExportCsvClick(object sender, RoutedEventArgs e)
+    private void OnExportHtmlClick(object sender, RoutedEventArgs e)
     {
         var viewModel = (MainViewModel)DataContext;
         var dialog = new SaveFileDialog
         {
-            Filter = "CSV (*.csv)|*.csv",
-            FileName = $"netpro_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            Filter = "HTML (*.html)|*.html",
+            FileName = $"netpro_{DateTime.Now:yyyyMMdd_HHmmss}.html"
         };
         if (dialog.ShowDialog() == true)
         {
-            // Excel only auto-detects UTF-8 (rather than misreading it as the system codepage
-            // and mangling the ping/placeholder symbols) when the file starts with a BOM.
-            var utf8WithBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: true);
-            File.WriteAllText(dialog.FileName, DeviceCsvExporter.ToCsv(viewModel.Devices), utf8WithBom);
+            File.WriteAllText(dialog.FileName, DeviceHtmlExporter.ToHtml(viewModel.Devices));
         }
     }
 }

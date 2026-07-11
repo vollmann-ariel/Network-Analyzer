@@ -5,10 +5,12 @@ A Windows desktop app that scans your local network and lists every device it fi
 ## Features
 
 - **Network scan**: sweeps the local subnet and reads the OS's IP neighbor table to discover devices, no elevation required.
-- **Vendor lookup**: infers the manufacturer of each device from its MAC address using the IEEE OUI registry (~40k entries, bundled locally).
-- **Ping latency**: measures round-trip time per device and reports the **rolling median** over recent samples, so an occasional network spike doesn't skew the number.
+- **Vendor lookup**: infers the manufacturer of each device from its MAC address using the IEEE OUI registry (~40k entries, bundled locally). Randomized/locally-administered MAC addresses are flagged as such instead of showing as an unknown vendor.
+- **Ping latency**: measures round-trip time per device and reports the **rolling median** over recent samples, so an occasional network spike doesn't skew the number. Devices that don't respond are marked as such in the list.
 - **Custom labels**: attach a personal reference (e.g. "Living room TV") to any device; labels are keyed by MAC address and persist across scans and restarts.
-- **Auto-refresh**: optionally re-scan on a configurable interval. New devices are added as they appear; devices that stop responding are kept in the list rather than removed.
+- **Device history**: every device ever seen (not just labeled ones) is remembered across restarts — IP, vendor, and label — so it's still listed (as unreachable) even when it's currently offline. Unlabeled randomized-MAC devices are the one exception: their address rotates per network, so persisting them would just accumulate entries that are never seen again.
+- **Auto-refresh**: optionally re-scan on a configurable interval (persisted across restarts). New devices are added as they appear; devices that stop responding are kept in the list rather than removed.
+- **HTML export**: export the current device list as a self-contained HTML file, viewable in any browser.
 
 ## Requirements
 
@@ -34,7 +36,8 @@ dotnet test
 NETpro/                  WPF application (net10.0-windows)
   Networking/             Subnet math, host sweeping, ARP table reading, ping measurement
   Oui/                    MAC vendor lookup (IEEE OUI database)
-  Labels/                 Persisted per-device labels (%LocalAppData%\NETpro\labels.json)
+  Persistence/            Device history (%LocalAppData%\NETpro\devices.json) and app settings (settings.json)
+  Export/                 HTML export of the device list
   ViewModels/              MVVM view model (CommunityToolkit.Mvvm)
   Assets/oui_vendors.tsv  Generated vendor database (see scripts/generate_oui_asset.py)
 NETpro.Tests/             xUnit test suite (fakes at the network/filesystem boundary)
@@ -46,5 +49,5 @@ Device discovery reads Windows' IP Helper API (`GetIpNetTable2`) rather than par
 
 ## Known limitations
 
-- **Randomized MAC addresses**: modern phones (Android, iOS) often use a random, rotating MAC per network rather than their factory-assigned one. Such devices show up as vendor "Unknown," and their custom label won't survive the MAC changing.
+- **Randomized MAC addresses**: modern phones (Android, iOS) often use a random, rotating MAC per network rather than their factory-assigned one. Such devices are flagged as having a randomized MAC, and a custom label on one won't survive the address changing.
 - **Model inference**: only the vendor is inferred from the MAC; the exact device model isn't reliably derivable from a MAC address alone.
