@@ -2,24 +2,34 @@ using System.Collections.ObjectModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using NETpro.Labels;
 using NETpro.Models;
 using NETpro.Networking;
+using NETpro.Oui;
+using NETpro.Persistence;
 using Timer = System.Threading.Timer;
 
 namespace NETpro.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {
+    private const string UnknownIpPlaceholder = "—";
+
     private readonly Func<Task<NetworkScanner>> _scannerProvider;
-    private readonly IDeviceLabelStore _labelStore;
+    private readonly IDeviceRecordStore _recordStore;
+    private readonly IAppSettingsStore _settingsStore;
     private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
     private Timer? _autoRefreshTimer;
 
-    public MainViewModel(Func<Task<NetworkScanner>> scannerProvider, IDeviceLabelStore labelStore)
+    public MainViewModel(Func<Task<NetworkScanner>> scannerProvider, IDeviceRecordStore recordStore, IAppSettingsStore settingsStore)
     {
         _scannerProvider = scannerProvider;
-        _labelStore = labelStore;
+        _recordStore = recordStore;
+        _settingsStore = settingsStore;
+        SeedKnownDevices();
+
+        var settings = _settingsStore.Load();
+        AutoRefreshIntervalSeconds = settings.AutoRefreshIntervalSeconds;
+        AutoRefreshEnabled = settings.AutoRefreshEnabled;
     }
 
     public ObservableCollection<DeviceInfo> Devices { get; } = [];
@@ -46,12 +56,17 @@ public partial class MainViewModel : ObservableObject
     {
         if (value) RestartAutoRefreshTimer();
         else StopAutoRefreshTimer();
+        SaveAutoRefreshSettings();
     }
 
     partial void OnAutoRefreshIntervalSecondsChanged(int value)
     {
         if (AutoRefreshEnabled) RestartAutoRefreshTimer();
+        SaveAutoRefreshSettings();
     }
+
+    private void SaveAutoRefreshSettings() =>
+        _settingsStore.Save(new AppSettings(AutoRefreshEnabled, AutoRefreshIntervalSeconds));
 
     private void RestartAutoRefreshTimer()
     {
@@ -108,31 +123,91 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Every device ever detected — not just ones the user has labeled — should be visible
+    /// immediately on startup, even before a scan confirms it's currently reachable. Otherwise
+    /// a known device that's temporarily off the network would disappear from the list entirely
+    /// and we'd have to rediscover it (and re-resolve its vendor) from scratch on every launch.
+    /// </summary>
+    private void SeedKnownDevices()
+    {
+        foreach (var (key, record) in _recordStore.GetAllRecords())
+        {
+            if (key == JsonFileDeviceRecordStore.SelfKey) continue;
+            var device = new DeviceInfo(record.LastKnownIp ?? UnknownIpPlaceholder, macAddress: key, vendor: record.LastKnownVendor, isSelf: false)
+            {
+                Label = record.Label
+            };
+            SubscribeLabelPersistence(device, key);
+            Devices.Add(device);
+        }
+    }
+
+    /// <summary>
+    /// Vendor is a pure function of the MAC address — it doesn't require the device to actually
+    /// respond. Devices seeded from a record with no cached vendor (e.g. carried over from a
+    /// label with no scan history yet) would otherwise show a blank Fabricante forever, since
+    /// MergeDevice only touches devices an actual scan finds. Called once the OUI table has
+    /// finished loading; the result is cached back to the store so this only runs once per device.
+    /// </summary>
+    public void ApplyVendorLookup(IOuiVendorLookup vendorLookup)
+    {
+        foreach (var device in Devices.Where(d => d.Vendor is null && d.MacAddress is not null))
+        {
+            var vendor = vendorLookup.Lookup(device.MacAddress!);
+            device.Vendor = vendor;
+            _recordStore.SetVendor(LabelKeyFor(device), vendor);
+        }
+    }
+
     private void MergeDevice(DeviceInfo scanned)
     {
         var key = LabelKeyFor(scanned);
         var existing = Devices.FirstOrDefault(d => LabelKeyFor(d) == key);
+        DeviceInfo tracked;
         if (existing is null)
         {
             AttachPersistedLabel(scanned);
-            Devices.Add(scanned);
+            if (scanned.IsSelf) Devices.Insert(0, scanned);
+            else Devices.Add(scanned);
+            tracked = scanned;
         }
         else
         {
+            existing.IpAddress = scanned.IpAddress;
+            existing.Vendor = scanned.Vendor;
             existing.PingTimeMs = scanned.PingTimeMs;
+            tracked = existing;
+        }
+
+        // Randomized MACs rotate per network the device joins, so an unlabeled one is never
+        // going to be seen again under this address — persisting it would just accumulate
+        // stale entries in the store forever. Once the user names it, it's worth keeping.
+        if (!scanned.IsSelf && ShouldPersist(tracked))
+        {
+            _recordStore.SetLastSeen(key, scanned.IpAddress, scanned.Vendor);
         }
     }
+
+    private static bool ShouldPersist(DeviceInfo device) =>
+        !string.IsNullOrEmpty(device.Label) || device.Vendor != TsvOuiVendorLookup.RandomizedMacVendor;
 
     private void AttachPersistedLabel(DeviceInfo device)
     {
         var key = LabelKeyFor(device);
-        device.Label = _labelStore.GetLabel(key) ?? (device.IsSelf ? "Este equipo" : string.Empty);
+        var storedLabel = _recordStore.GetRecord(key)?.Label;
+        device.Label = !string.IsNullOrEmpty(storedLabel) ? storedLabel : (device.IsSelf ? "Este equipo" : string.Empty);
+        SubscribeLabelPersistence(device, key);
+    }
+
+    private void SubscribeLabelPersistence(DeviceInfo device, string key)
+    {
         device.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(DeviceInfo.Label)) _labelStore.SetLabel(key, device.Label);
+            if (args.PropertyName == nameof(DeviceInfo.Label)) _recordStore.SetLabel(key, device.Label);
         };
     }
 
     private static string LabelKeyFor(DeviceInfo device) =>
-        device.IsSelf ? JsonFileDeviceLabelStore.SelfKey : device.MacAddress ?? device.IpAddress;
+        device.IsSelf ? JsonFileDeviceRecordStore.SelfKey : device.MacAddress ?? device.IpAddress;
 }

@@ -17,6 +17,11 @@
                     Content="Actualizar"
                     Padding="12,4"
                     Command="{Binding RefreshCommand}" />
+            <Button DockPanel.Dock="Right"
+                    Content="Exportar CSV"
+                    Padding="12,4"
+                    Margin="0,0,8,0"
+                    Click="OnExportCsvClick" />
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
                 <CheckBox Content="Auto-actualizar cada"
                           VerticalAlignment="Center"
@@ -50,7 +55,7 @@
                 <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" IsReadOnly="True" Width="130" />
                 <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" IsReadOnly="True" Width="150" />
                 <DataGridTextColumn Header="Fabricante" Binding="{Binding Vendor}" IsReadOnly="True" Width="*" />
-                <DataGridTextColumn Header="Ping" Binding="{Binding PingDisplay}" IsReadOnly="True" Width="90" />
+                <DataGridTextColumn Header="Ping" Binding="{Binding PingDisplay}" IsReadOnly="True" Width="115" />
                 <DataGridTextColumn Header="Referencia" Binding="{Binding Label}" Width="160" />
             </DataGrid.Columns>
         </DataGrid>

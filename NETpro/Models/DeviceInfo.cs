@@ -4,15 +4,20 @@ namespace NETpro.Models;
 
 public partial class DeviceInfo(string ipAddress, string? macAddress, string? vendor, bool isSelf) : ObservableObject
 {
-    public string IpAddress { get; } = ipAddress;
+    [ObservableProperty]
+    private string _ipAddress = ipAddress;
+
     public string? MacAddress { get; } = macAddress;
-    public string? Vendor { get; } = vendor;
+
+    [ObservableProperty]
+    private string? _vendor = vendor;
+
     public bool IsSelf { get; } = isSelf;
 
     [ObservableProperty]
     private long? _pingTimeMs;
 
-    public string PingDisplay => PingTimeMs is { } ms ? $"{ms} ms" : "Sin respuesta";
+    public string PingDisplay => PingTimeMs is { } ms ? $"{ms} ms" : "🚫 Sin conexión";
 
     [ObservableProperty]
     private string _label = string.Empty;

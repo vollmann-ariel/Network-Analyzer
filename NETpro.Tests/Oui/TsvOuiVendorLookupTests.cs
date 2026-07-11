@@ -34,6 +34,18 @@ public class TsvOuiVendorLookupTests
     }
 
     [Fact]
+    public void Lookup_ReturnsRandomizedMacVendor_ForLocallyAdministeredMac()
+    {
+        Assert.Equal(TsvOuiVendorLookup.RandomizedMacVendor, Lookup.Lookup("0a:6c:7d:33:5b:2f"));
+    }
+
+    [Fact]
+    public void IsLocallyAdministered_ReturnsFalse_ForMalformedShortMac()
+    {
+        Assert.False(TsvOuiVendorLookup.IsLocallyAdministered("AA:BB"));
+    }
+
+    [Fact]
     public void LoadFromFile_ParsesRealTsvFormat()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "sample_oui.tsv");
