@@ -11,6 +11,7 @@ public interface IDeviceRecordStore
     void SetLabel(string key, string label);
     void SetLastSeen(string key, string ip, string? vendor);
     void SetVendor(string key, string vendor);
+    void Remove(string key);
     IReadOnlyDictionary<string, DeviceRecord> GetAllRecords();
 }
 
@@ -64,6 +65,11 @@ public sealed class JsonFileDeviceRecordStore : IDeviceRecordStore
         var current = _records.GetValueOrDefault(key) ?? new DeviceRecord("", null, null);
         _records[key] = current with { LastKnownVendor = vendor };
         Save();
+    }
+
+    public void Remove(string key)
+    {
+        if (_records.Remove(key)) Save();
     }
 
     private static Dictionary<string, DeviceRecord> Load(string path)

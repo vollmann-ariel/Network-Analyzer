@@ -18,4 +18,6 @@ public sealed class FakeDeviceRecordStore : IDeviceRecordStore
 
     public void SetVendor(string key, string vendor) =>
         _records[key] = (_records.GetValueOrDefault(key) ?? new DeviceRecord("", null, null)) with { LastKnownVendor = vendor };
+
+    public void Remove(string key) => _records.Remove(key);
 }

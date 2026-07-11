@@ -204,7 +204,12 @@ public partial class MainViewModel : ObservableObject
     {
         device.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(DeviceInfo.Label)) _recordStore.SetLabel(key, device.Label);
+            if (args.PropertyName != nameof(DeviceInfo.Label)) return;
+            // Clearing the label on an unlabeled-randomized-MAC device must drop the record
+            // entirely (same ShouldPersist rule MergeDevice uses), or it re-accumulates the
+            // very "flooding" entries the label check was added to prevent.
+            if (ShouldPersist(device)) _recordStore.SetLabel(key, device.Label);
+            else _recordStore.Remove(key);
         };
     }
 

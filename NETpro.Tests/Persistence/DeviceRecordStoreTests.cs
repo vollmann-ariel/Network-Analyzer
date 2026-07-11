@@ -79,6 +79,15 @@ public class DeviceRecordStoreTests : IDisposable
     }
 
     [Fact]
+    public void Remove_DeletesTheEntry_EvenWhenSightingDataExists()
+    {
+        var store = new JsonFileDeviceRecordStore(_path);
+        store.SetLastSeen("aa:bb:cc:dd:ee:ff", "192.168.1.20", "Acme Inc.");
+        store.Remove("aa:bb:cc:dd:ee:ff");
+        Assert.Null(store.GetRecord("aa:bb:cc:dd:ee:ff"));
+    }
+
+    [Fact]
     public void GetAllRecords_IncludesEverySetEntry()
     {
         var store = new JsonFileDeviceRecordStore(_path);

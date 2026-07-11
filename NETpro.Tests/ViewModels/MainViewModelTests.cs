@@ -202,6 +202,36 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task ClearingTheLabel_RemovesARandomizedMacDevice_ThatWasOnlyKeptBecauseOfTheLabel()
+    {
+        var store = new FakeDeviceRecordStore();
+        store.SetLabel("aa:bb:cc:dd:ee:ff", "Celular Ariel");
+        var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
+        var vm = BuildViewModel(
+            ScannerProvider(Info, new FakeArpTableReader(entries), new FakeOuiVendorLookup(TsvOuiVendorLookup.RandomizedMacVendor)),
+            store);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        vm.Devices.Single(d => d.MacAddress == "aa:bb:cc:dd:ee:ff").Label = "";
+
+        Assert.Null(store.GetRecord("aa:bb:cc:dd:ee:ff"));
+    }
+
+    [Fact]
+    public async Task ClearingTheLabel_KeepsARegularDevice_WithSightingHistory()
+    {
+        var store = new FakeDeviceRecordStore();
+        store.SetLabel("aa:bb:cc:dd:ee:ff", "Impresora");
+        var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
+        var vm = BuildViewModel(ScannerProvider(Info, new FakeArpTableReader(entries)), store);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        vm.Devices.Single(d => d.MacAddress == "aa:bb:cc:dd:ee:ff").Label = "";
+
+        Assert.Equal("192.168.1.20", store.GetRecord("aa:bb:cc:dd:ee:ff")?.LastKnownIp);
+    }
+
+    [Fact]
     public void Constructor_SeedsAnUnlabeledButPreviouslySeenDevice_FromLastSeenData()
     {
         var store = new FakeDeviceRecordStore();
