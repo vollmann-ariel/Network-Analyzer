@@ -35,7 +35,7 @@ public partial class App : Application
             new(networkInfoProvider, sweeper, arpTableReader, await vendorLookupTask, pingTimeMeasurer, portScanner);
 
         var viewModel = new MainViewModel(ScannerProvider, recordStore, settingsStore, _deviceNotifier);
-        var mainWindow = new MainWindow { DataContext = viewModel };
+        var mainWindow = new MainWindow(settingsStore) { DataContext = viewModel };
         mainWindow.Show();
 
         ApplyVendorLookupOnceLoadedAsync(viewModel, vendorLookupTask);

@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -12,6 +13,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using NETpro.Export;
+using NETpro.Persistence;
 using NETpro.ViewModels;
 
 namespace NETpro;
@@ -21,12 +23,44 @@ namespace NETpro;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly IAppSettingsStore _settingsStore;
     private readonly DispatcherTimer _copyToastTimer = new() { Interval = TimeSpan.FromMilliseconds(1200) };
+    private string? _pendingCopyText;
 
-    public MainWindow()
+    public MainWindow(IAppSettingsStore settingsStore)
     {
         InitializeComponent();
+        _settingsStore = settingsStore;
         _copyToastTimer.Tick += (_, _) => HideCopyToast();
+        ApplySavedWindowState();
+        Closing += OnWindowClosing;
+    }
+
+    private void ApplySavedWindowState()
+    {
+        var settings = _settingsStore.Load();
+        Width = settings.WindowWidth;
+        Height = settings.WindowHeight;
+        foreach (var column in DevicesGrid.Columns)
+        {
+            if (column.Header?.ToString() is { } header && settings.ColumnWidths.TryGetValue(header, out var width))
+            {
+                column.Width = new DataGridLength(width);
+            }
+        }
+    }
+
+    private void OnWindowClosing(object? sender, CancelEventArgs e)
+    {
+        var columnWidths = DevicesGrid.Columns
+            .Where(c => c.Header is not null)
+            .ToDictionary(c => c.Header.ToString()!, c => c.ActualWidth);
+        _settingsStore.Save(_settingsStore.Load() with
+        {
+            WindowWidth = Width,
+            WindowHeight = Height,
+            ColumnWidths = columnWidths
+        });
     }
 
     private void OnExportHtmlClick(object sender, RoutedEventArgs e)
@@ -43,14 +77,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnDeviceCellClick(object sender, MouseButtonEventArgs e)
+    private void OnDeviceCellRightClick(object sender, MouseButtonEventArgs e)
     {
-        if (e.OriginalSource is not DependencyObject source) return;
-        var cell = FindAncestor<DataGridCell>(source);
-        var text = CellText(cell);
-        if (string.IsNullOrEmpty(text)) return;
-        Clipboard.SetText(text);
-        ShowCopyToast(text);
+        _pendingCopyText = e.OriginalSource is DependencyObject source
+            ? CellText(FindAncestor<DataGridCell>(source))
+            : null;
+    }
+
+    private void OnCopyMenuItemClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_pendingCopyText)) return;
+        Clipboard.SetText(_pendingCopyText);
+        ShowCopyToast(_pendingCopyText);
     }
 
     private void ShowCopyToast(string value)

@@ -334,6 +334,17 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public void SettingAutoRefreshEnabled_PreservesTheWindowSize_AlreadyInTheSettingsStore()
+    {
+        var settingsStore = new FakeAppSettingsStore(AppSettings.Default with { WindowWidth = 1024 });
+        var vm = BuildViewModel(ScannerProvider(Info), settingsStore: settingsStore);
+
+        vm.AutoRefreshEnabled = true;
+
+        Assert.Equal(1024, settingsStore.Load().WindowWidth);
+    }
+
+    [Fact]
     public void ApplyVendorLookup_FillsInVendor_ForADeviceSeededWithoutOne()
     {
         var store = new FakeDeviceRecordStore();

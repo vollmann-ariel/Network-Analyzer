@@ -73,7 +73,11 @@ public partial class MainViewModel : ObservableObject
     }
 
     private void SaveAutoRefreshSettings() =>
-        _settingsStore.Save(new AppSettings(AutoRefreshEnabled, AutoRefreshIntervalSeconds));
+        _settingsStore.Save(_settingsStore.Load() with
+        {
+            AutoRefreshEnabled = AutoRefreshEnabled,
+            AutoRefreshIntervalSeconds = AutoRefreshIntervalSeconds
+        });
 
     private void RestartAutoRefreshTimer()
     {

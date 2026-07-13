@@ -48,12 +48,18 @@
                    Text="No se encontraron otros dispositivos."
                    Visibility="{Binding ShowEmptyHint, Converter={StaticResource BoolToVis}}" />
 
-        <DataGrid ItemsSource="{Binding Devices}"
+        <DataGrid x:Name="DevicesGrid"
+                  ItemsSource="{Binding Devices}"
                   AutoGenerateColumns="False"
                   IsReadOnly="False"
                   CanUserAddRows="False"
                   GridLinesVisibility="Horizontal"
-                  PreviewMouseLeftButtonUp="OnDeviceCellClick">
+                  PreviewMouseRightButtonDown="OnDeviceCellRightClick">
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copiar" Click="OnCopyMenuItemClick" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" IsReadOnly="True" Width="130" />
                 <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" IsReadOnly="True" Width="150" />
