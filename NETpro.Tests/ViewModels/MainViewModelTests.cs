@@ -165,9 +165,22 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RefreshCommand_RecordsLastSeenIp_ForADeviceWithNoLabel()
+    public async Task RefreshCommand_DoesNotPersist_ADeviceWithNoLabel()
     {
         var store = new FakeDeviceRecordStore();
+        var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
+        var vm = BuildViewModel(ScannerProvider(Info, new FakeArpTableReader(entries)), store);
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Null(store.GetRecord("aa:bb:cc:dd:ee:ff"));
+    }
+
+    [Fact]
+    public async Task RefreshCommand_PersistsLastSeenIp_ForALabeledDevice()
+    {
+        var store = new FakeDeviceRecordStore();
+        store.SetLabel("aa:bb:cc:dd:ee:ff", "Impresora");
         var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
         var vm = BuildViewModel(ScannerProvider(Info, new FakeArpTableReader(entries)), store);
 
@@ -288,7 +301,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task ClearingTheLabel_KeepsARegularDevice_WithSightingHistory()
+    public async Task ClearingTheLabel_RemovesARegularDevice_EvenWithSightingHistory()
     {
         var store = new FakeDeviceRecordStore();
         store.SetLabel("aa:bb:cc:dd:ee:ff", "Impresora");
@@ -298,18 +311,29 @@ public class MainViewModelTests
 
         vm.Devices.Single(d => d.MacAddress == "aa:bb:cc:dd:ee:ff").Label = "";
 
-        Assert.Equal("192.168.1.20", store.GetRecord("aa:bb:cc:dd:ee:ff")?.LastKnownIp);
+        Assert.Null(store.GetRecord("aa:bb:cc:dd:ee:ff"));
     }
 
     [Fact]
-    public void Constructor_SeedsAnUnlabeledButPreviouslySeenDevice_FromLastSeenData()
+    public void Constructor_DoesNotSeed_AnUnlabeledPreviouslySeenDevice()
     {
         var store = new FakeDeviceRecordStore();
         store.SetLastSeen("aa:bb:cc:dd:ee:ff", "192.168.1.20", "Acme Inc.");
 
         var vm = BuildViewModel(ScannerProvider(Info), store);
 
-        Assert.Contains(vm.Devices, d => d.MacAddress == "aa:bb:cc:dd:ee:ff" && d.IpAddress == "192.168.1.20");
+        Assert.Empty(vm.Devices);
+    }
+
+    [Fact]
+    public void Constructor_RemovesAnUnlabeledPreviouslySeenDevice_FromTheStore()
+    {
+        var store = new FakeDeviceRecordStore();
+        store.SetLastSeen("aa:bb:cc:dd:ee:ff", "192.168.1.20", "Acme Inc.");
+
+        _ = BuildViewModel(ScannerProvider(Info), store);
+
+        Assert.Null(store.GetRecord("aa:bb:cc:dd:ee:ff"));
     }
 
     [Fact]

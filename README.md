@@ -2,13 +2,15 @@
 
 A Windows desktop app that scans your local network and lists every device it finds — IP address, MAC address, inferred vendor, and round-trip ping latency — without requiring administrator privileges.
 
+![NETpro screenshot](docs/screenshot.png)
+
 ## Features
 
 - **Network scan**: sweeps the local subnet and reads the OS's IP neighbor table to discover devices, no elevation required.
 - **Vendor lookup**: infers the manufacturer of each device from its MAC address using the IEEE OUI registry (~40k entries, bundled locally). Randomized/locally-administered MAC addresses are flagged as such instead of showing as an unknown vendor.
 - **Ping latency**: measures round-trip time per device and reports the **rolling median** over recent samples, so an occasional network spike doesn't skew the number. Devices that don't respond are marked as such in the list.
 - **Custom labels**: attach a personal reference (e.g. "Living room TV") to any device; labels are keyed by MAC address and persist across scans and restarts.
-- **Device history**: every device ever seen (not just labeled ones) is remembered across restarts — IP, vendor, and label — so it's still listed (as unreachable) even when it's currently offline. Unlabeled randomized-MAC devices are the one exception: their address rotates per network, so persisting them would just accumulate entries that are never seen again.
+- **Device history**: labeled devices are remembered across restarts — IP, vendor, and label — so they're still listed (as unreachable) even when currently offline. Unlabeled devices aren't persisted at all: clearing a device's label removes it from the on-disk history immediately, instead of leaving a nameless entry that keeps reappearing.
 - **Auto-refresh**: optionally re-scan on a configurable interval (persisted across restarts). New devices are added as they appear; devices that stop responding are kept in the list rather than removed.
 - **HTML export**: export the current device list as a self-contained HTML file, viewable in any browser.
 - **Copy to clipboard**: right-click any cell for a context menu with a "Copiar" option.

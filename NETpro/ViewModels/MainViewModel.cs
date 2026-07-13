@@ -135,16 +135,23 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Every device ever detected — not just ones the user has labeled — should be visible
-    /// immediately on startup, even before a scan confirms it's currently reachable. Otherwise
-    /// a known device that's temporarily off the network would disappear from the list entirely
-    /// and we'd have to rediscover it (and re-resolve its vendor) from scratch on every launch.
+    /// Every labeled device — not just ones currently online — should be visible immediately
+    /// on startup, even before a scan confirms it's reachable. Otherwise a known device that's
+    /// temporarily off the network would disappear from the list entirely and we'd have to
+    /// rediscover it (and re-resolve its vendor) from scratch on every launch. Unlabeled
+    /// records have no such purpose to the user, so they're purged here instead of piling up
+    /// forever in the store.
     /// </summary>
     private void SeedKnownDevices()
     {
         foreach (var (key, record) in _recordStore.GetAllRecords())
         {
             if (key == JsonFileDeviceRecordStore.SelfKey) continue;
+            if (string.IsNullOrEmpty(record.Label))
+            {
+                _recordStore.Remove(key);
+                continue;
+            }
             var device = new DeviceInfo(record.LastKnownIp ?? UnknownIpPlaceholder, macAddress: key, vendor: record.LastKnownVendor, isSelf: false)
             {
                 Label = record.Label
@@ -193,9 +200,9 @@ public partial class MainViewModel : ObservableObject
             tracked = existing;
         }
 
-        // Randomized MACs rotate per network the device joins, so an unlabeled one is never
-        // going to be seen again under this address — persisting it would just accumulate
-        // stale entries in the store forever. Once the user names it, it's worth keeping.
+        // Only labeled devices are worth remembering once they go offline — an unlabeled one
+        // (including a randomized MAC, which rotates per network and is never seen again under
+        // this address anyway) would otherwise just accumulate stale entries in the store.
         if (!scanned.IsSelf && ShouldPersist(tracked))
         {
             _recordStore.SetLastSeen(key, scanned.IpAddress, scanned.Vendor);
@@ -203,15 +210,18 @@ public partial class MainViewModel : ObservableObject
 
         // HasScanned is still false during the app's very first scan (it flips only after
         // RefreshAsync finishes), so a cold start with an empty device history doesn't fire
-        // one notification per device already sitting on the LAN.
-        if (isNewDevice && !scanned.IsSelf && HasScanned && ShouldPersist(tracked))
+        // one notification per device already sitting on the LAN. This is deliberately not
+        // gated on ShouldPersist: a brand-new device is unlabeled by definition, so that check
+        // would suppress every single notification.
+        if (isNewDevice && !scanned.IsSelf && HasScanned && IsWorthNotifying(tracked))
         {
             _deviceNotifier.NotifyNewDevice(tracked);
         }
     }
 
-    private static bool ShouldPersist(DeviceInfo device) =>
-        !string.IsNullOrEmpty(device.Label) || device.Vendor != TsvOuiVendorLookup.RandomizedMacVendor;
+    private static bool ShouldPersist(DeviceInfo device) => !string.IsNullOrEmpty(device.Label);
+
+    private static bool IsWorthNotifying(DeviceInfo device) => device.Vendor != TsvOuiVendorLookup.RandomizedMacVendor;
 
     private void AttachPersistedLabel(DeviceInfo device)
     {
@@ -226,9 +236,9 @@ public partial class MainViewModel : ObservableObject
         device.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName != nameof(DeviceInfo.Label)) return;
-            // Clearing the label on an unlabeled-randomized-MAC device must drop the record
-            // entirely (same ShouldPersist rule MergeDevice uses), or it re-accumulates the
-            // very "flooding" entries the label check was added to prevent.
+            // Clearing the label must drop the record entirely (same ShouldPersist rule
+            // MergeDevice uses) — otherwise the device keeps loading as a nameless offline
+            // entry on every launch instead of actually being forgotten.
             if (ShouldPersist(device)) _recordStore.SetLabel(key, device.Label);
             else _recordStore.Remove(key);
         };
