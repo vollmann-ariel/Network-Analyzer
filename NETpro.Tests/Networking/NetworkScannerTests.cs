@@ -11,6 +11,7 @@ public class NetworkScannerTests
     private static readonly NetworkSweeper Sweeper = new(new NoOpHostProber());
     private static readonly FakeOuiVendorLookup VendorLookup = new("Fake Vendor");
     private static readonly FakePingTimeMeasurer PingTimeMeasurer = new(10);
+    private static readonly FakePortScanner PortScanner = new();
 
     private static NetworkScanner ScannerWith(IReadOnlyList<NeighborEntry> entries, LocalNetworkInfo? info = null) =>
         new(
@@ -18,7 +19,8 @@ public class NetworkScannerTests
             Sweeper,
             new FakeArpTableReader(entries),
             VendorLookup,
-            PingTimeMeasurer);
+            PingTimeMeasurer,
+            PortScanner);
 
     [Fact]
     public async Task Scan_IncludesSelfEntry_WithNullMac()
@@ -77,8 +79,22 @@ public class NetworkScannerTests
     [Fact]
     public async Task Scan_ReturnsNoActiveNetwork_WhenNetworkInfoMissing()
     {
-        var scanner = new NetworkScanner(new FakeNetworkInfoProvider(null), Sweeper, new FakeArpTableReader([]), VendorLookup, PingTimeMeasurer);
+        var scanner = new NetworkScanner(new FakeNetworkInfoProvider(null), Sweeper, new FakeArpTableReader([]), VendorLookup, PingTimeMeasurer, PortScanner);
         var result = await scanner.ScanAsync();
         Assert.IsType<ScanResult.NoActiveNetwork>(result);
+    }
+
+    [Fact]
+    public async Task Scan_AttachesOpenPorts_ToEachDevice()
+    {
+        var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
+        var scanner = new NetworkScanner(
+            new FakeNetworkInfoProvider(Info), Sweeper, new FakeArpTableReader(entries), VendorLookup, PingTimeMeasurer,
+            new FakePortScanner([80, 443]));
+
+        var result = (ScanResult.Success)await scanner.ScanAsync();
+
+        var other = result.Devices.Single(d => !d.IsSelf);
+        Assert.Equal([80, 443], other.OpenPorts);
     }
 }

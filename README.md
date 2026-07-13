@@ -11,6 +11,9 @@ A Windows desktop app that scans your local network and lists every device it fi
 - **Device history**: every device ever seen (not just labeled ones) is remembered across restarts — IP, vendor, and label — so it's still listed (as unreachable) even when it's currently offline. Unlabeled randomized-MAC devices are the one exception: their address rotates per network, so persisting them would just accumulate entries that are never seen again.
 - **Auto-refresh**: optionally re-scan on a configurable interval (persisted across restarts). New devices are added as they appear; devices that stop responding are kept in the list rather than removed.
 - **HTML export**: export the current device list as a self-contained HTML file, viewable in any browser.
+- **Click-to-copy**: click any cell to copy its value to the clipboard.
+- **Service detection**: probes each device for common open ports (HTTP, HTTPS, SSH, RDP, FTP, Telnet, SMB) with a plain TCP connect scan — no elevation required. Shown both as friendly service names and as raw port numbers.
+- **New device alerts**: a Windows notification fires the first time a genuinely new device joins the network (suppressed on the app's first scan of a session, and for unlabeled randomized-MAC devices, to avoid noise).
 
 ## Requirements
 
@@ -34,9 +37,10 @@ dotnet test
 
 ```
 NETpro/                  WPF application (net10.0-windows)
-  Networking/             Subnet math, host sweeping, ARP table reading, ping measurement
+  Networking/             Subnet math, host sweeping, ARP table reading, ping measurement, port scanning
   Oui/                    MAC vendor lookup (IEEE OUI database)
   Persistence/            Device history (%LocalAppData%\NETpro\devices.json) and app settings (settings.json)
+  Notifications/          Windows notification for newly-seen devices
   Export/                 HTML export of the device list
   ViewModels/              MVVM view model (CommunityToolkit.Mvvm)
   Assets/oui_vendors.tsv  Generated vendor database (see scripts/generate_oui_asset.py)

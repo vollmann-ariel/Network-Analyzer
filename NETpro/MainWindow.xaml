@@ -6,11 +6,13 @@
         xmlns:local="clr-namespace:NETpro"
         xmlns:conv="clr-namespace:NETpro.Converters"
         mc:Ignorable="d"
-        Title="NETpro" Height="500" Width="800">
+        Title="NETpro" Height="500" Width="800"
+        Icon="Assets/Icon.ico">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
     </Window.Resources>
+    <Grid>
     <DockPanel Margin="12">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <Button DockPanel.Dock="Right"
@@ -50,14 +52,30 @@
                   AutoGenerateColumns="False"
                   IsReadOnly="False"
                   CanUserAddRows="False"
-                  GridLinesVisibility="Horizontal">
+                  GridLinesVisibility="Horizontal"
+                  PreviewMouseLeftButtonUp="OnDeviceCellClick">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" IsReadOnly="True" Width="130" />
                 <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" IsReadOnly="True" Width="150" />
                 <DataGridTextColumn Header="Fabricante" Binding="{Binding Vendor}" IsReadOnly="True" Width="*" />
                 <DataGridTextColumn Header="Ping" Binding="{Binding PingDisplay}" IsReadOnly="True" Width="115" />
+                <DataGridTextColumn Header="Servicios" Binding="{Binding ServicesDisplay}" IsReadOnly="True" Width="130" />
+                <DataGridTextColumn Header="Puertos abiertos" Binding="{Binding OpenPortsDisplay}" IsReadOnly="True" Width="120" />
                 <DataGridTextColumn Header="Referencia" Binding="{Binding Label}" Width="160" />
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>
+
+    <Border x:Name="CopyToast"
+            Background="#CC323232"
+            CornerRadius="4"
+            Padding="14,8"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,24"
+            Opacity="0"
+            IsHitTestVisible="False">
+        <TextBlock x:Name="CopyToastText" Foreground="White" FontSize="13" />
+    </Border>
+    </Grid>
 </Window>

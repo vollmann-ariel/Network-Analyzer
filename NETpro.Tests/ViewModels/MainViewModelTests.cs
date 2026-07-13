@@ -1,5 +1,6 @@
 using System.Net;
 using NETpro.Networking;
+using NETpro.Notifications;
 using NETpro.Oui;
 using NETpro.Persistence;
 using NETpro.Tests.Fakes;
@@ -20,13 +21,15 @@ public class MainViewModelTests
             new NetworkSweeper(new NoOpHostProber()),
             arpTableReader ?? new FakeArpTableReader([]),
             vendorLookup ?? new FakeOuiVendorLookup(),
-            new FakePingTimeMeasurer()));
+            new FakePingTimeMeasurer(),
+            new FakePortScanner()));
 
     private static MainViewModel BuildViewModel(
         Func<Task<NetworkScanner>> scannerProvider,
         IDeviceRecordStore? recordStore = null,
-        IAppSettingsStore? settingsStore = null) =>
-        new(scannerProvider, recordStore ?? new FakeDeviceRecordStore(), settingsStore ?? new FakeAppSettingsStore());
+        IAppSettingsStore? settingsStore = null,
+        IDeviceNotifier? deviceNotifier = null) =>
+        new(scannerProvider, recordStore ?? new FakeDeviceRecordStore(), settingsStore ?? new FakeAppSettingsStore(), deviceNotifier ?? new FakeDeviceNotifier());
 
     [Fact]
     public async Task RefreshCommand_PopulatesDevices_OnSuccess()
@@ -114,7 +117,8 @@ public class MainViewModelTests
                 new NetworkSweeper(new NoOpHostProber()),
                 new FakeArpTableReader(entries),
                 new FakeOuiVendorLookup(),
-                new FakePingTimeMeasurer()));
+                new FakePingTimeMeasurer(),
+                new FakePortScanner()));
         }
 
         var vm = BuildViewModel(Provider);
@@ -199,6 +203,72 @@ public class MainViewModelTests
         await vm.RefreshCommand.ExecuteAsync(null);
 
         Assert.Equal("192.168.1.20", store.GetRecord("aa:bb:cc:dd:ee:ff")?.LastKnownIp);
+    }
+
+    [Fact]
+    public async Task RefreshCommand_DoesNotNotify_ForANewDevice_OnTheFirstScanOfTheSession()
+    {
+        var notifier = new FakeDeviceNotifier();
+        var entries = new[] { new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true) };
+        var vm = BuildViewModel(ScannerProvider(Info, new FakeArpTableReader(entries)), deviceNotifier: notifier);
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Empty(notifier.NotifiedDevices);
+    }
+
+    [Fact]
+    public async Task RefreshCommand_NotifiesNewDevice_OnALaterScan()
+    {
+        var notifier = new FakeDeviceNotifier();
+        var scanCount = 0;
+        Task<NetworkScanner> Provider()
+        {
+            scanCount++;
+            IReadOnlyList<NeighborEntry> entries = scanCount == 1
+                ? []
+                : [new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true)];
+            return Task.FromResult(new NetworkScanner(
+                new FakeNetworkInfoProvider(Info),
+                new NetworkSweeper(new NoOpHostProber()),
+                new FakeArpTableReader(entries),
+                new FakeOuiVendorLookup(),
+                new FakePingTimeMeasurer(),
+                new FakePortScanner()));
+        }
+        var vm = BuildViewModel(Provider, deviceNotifier: notifier);
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Equal("192.168.1.20", notifier.NotifiedDevices.Single().IpAddress);
+    }
+
+    [Fact]
+    public async Task RefreshCommand_DoesNotNotify_ARandomizedMacDeviceWithNoLabel_OnALaterScan()
+    {
+        var notifier = new FakeDeviceNotifier();
+        var scanCount = 0;
+        Task<NetworkScanner> Provider()
+        {
+            scanCount++;
+            IReadOnlyList<NeighborEntry> entries = scanCount == 1
+                ? []
+                : [new NeighborEntry(IPAddress.Parse("192.168.1.20"), "aa:bb:cc:dd:ee:ff", InterfaceIndex: 5, IsResolved: true)];
+            return Task.FromResult(new NetworkScanner(
+                new FakeNetworkInfoProvider(Info),
+                new NetworkSweeper(new NoOpHostProber()),
+                new FakeArpTableReader(entries),
+                new FakeOuiVendorLookup(TsvOuiVendorLookup.RandomizedMacVendor),
+                new FakePingTimeMeasurer(),
+                new FakePortScanner()));
+        }
+        var vm = BuildViewModel(Provider, deviceNotifier: notifier);
+
+        await vm.RefreshCommand.ExecuteAsync(null);
+        await vm.RefreshCommand.ExecuteAsync(null);
+
+        Assert.Empty(notifier.NotifiedDevices);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using NETpro.Models;
 using NETpro.Networking;
+using NETpro.Notifications;
 using NETpro.Oui;
 using NETpro.Persistence;
 using Timer = System.Threading.Timer;
@@ -17,14 +18,20 @@ public partial class MainViewModel : ObservableObject
     private readonly Func<Task<NetworkScanner>> _scannerProvider;
     private readonly IDeviceRecordStore _recordStore;
     private readonly IAppSettingsStore _settingsStore;
+    private readonly IDeviceNotifier _deviceNotifier;
     private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
     private Timer? _autoRefreshTimer;
 
-    public MainViewModel(Func<Task<NetworkScanner>> scannerProvider, IDeviceRecordStore recordStore, IAppSettingsStore settingsStore)
+    public MainViewModel(
+        Func<Task<NetworkScanner>> scannerProvider,
+        IDeviceRecordStore recordStore,
+        IAppSettingsStore settingsStore,
+        IDeviceNotifier deviceNotifier)
     {
         _scannerProvider = scannerProvider;
         _recordStore = recordStore;
         _settingsStore = settingsStore;
+        _deviceNotifier = deviceNotifier;
         SeedKnownDevices();
 
         var settings = _settingsStore.Load();
@@ -164,6 +171,7 @@ public partial class MainViewModel : ObservableObject
     {
         var key = LabelKeyFor(scanned);
         var existing = Devices.FirstOrDefault(d => LabelKeyFor(d) == key);
+        var isNewDevice = existing is null;
         DeviceInfo tracked;
         if (existing is null)
         {
@@ -177,6 +185,7 @@ public partial class MainViewModel : ObservableObject
             existing.IpAddress = scanned.IpAddress;
             existing.Vendor = scanned.Vendor;
             existing.PingTimeMs = scanned.PingTimeMs;
+            existing.OpenPorts = scanned.OpenPorts;
             tracked = existing;
         }
 
@@ -186,6 +195,14 @@ public partial class MainViewModel : ObservableObject
         if (!scanned.IsSelf && ShouldPersist(tracked))
         {
             _recordStore.SetLastSeen(key, scanned.IpAddress, scanned.Vendor);
+        }
+
+        // HasScanned is still false during the app's very first scan (it flips only after
+        // RefreshAsync finishes), so a cold start with an empty device history doesn't fire
+        // one notification per device already sitting on the LAN.
+        if (isNewDevice && !scanned.IsSelf && HasScanned && ShouldPersist(tracked))
+        {
+            _deviceNotifier.NotifyNewDevice(tracked);
         }
     }
 

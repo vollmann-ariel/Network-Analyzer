@@ -18,11 +18,13 @@ public sealed class NetworkScanner(
     NetworkSweeper sweeper,
     IArpTableReader arpTableReader,
     IOuiVendorLookup vendorLookup,
-    IPingTimeMeasurer pingTimeMeasurer)
+    IPingTimeMeasurer pingTimeMeasurer,
+    IPortScanner portScanner)
 {
     public const int MaxScanHosts = 1024;
     public const int PingSamplesPerDevice = 5;
     private const int MaxPingConcurrency = 16;
+    private const int MaxPortScanConcurrency = 16;
 
     public async Task<ScanResult> ScanAsync(CancellationToken ct = default)
     {
@@ -53,21 +55,27 @@ public sealed class NetworkScanner(
             .OrderBy(e => IpSortKey(e.IpAddress.ToString()))
             .ToList();
 
-        var pingTimes = await MeasurePingTimesAsync(
-            otherEntries.Select(e => e.IpAddress).Append(info.IpAddress).ToList(), ct);
+        var ips = otherEntries.Select(e => e.IpAddress).Append(info.IpAddress).ToList();
+        var pingTimesTask = MeasurePingTimesAsync(ips, ct);
+        var openPortsTask = ScanPortsAsync(ips, ct);
+        await Task.WhenAll(pingTimesTask, openPortsTask);
+        var pingTimes = pingTimesTask.Result;
+        var openPorts = openPortsTask.Result;
 
         var others = otherEntries
             .Select(e => new DeviceInfo(
                 e.IpAddress.ToString(), e.MacAddress, vendorLookup.Lookup(e.MacAddress), isSelf: false)
             {
-                PingTimeMs = pingTimes.GetValueOrDefault(e.IpAddress)
+                PingTimeMs = pingTimes.GetValueOrDefault(e.IpAddress),
+                OpenPorts = openPorts.GetValueOrDefault(e.IpAddress, [])
             })
             .ToList();
 
         var self = new DeviceInfo(
             info.IpAddress.ToString(), macAddress: null, vendor: null, isSelf: true)
         {
-            PingTimeMs = pingTimes.GetValueOrDefault(info.IpAddress)
+            PingTimeMs = pingTimes.GetValueOrDefault(info.IpAddress),
+            OpenPorts = openPorts.GetValueOrDefault(info.IpAddress, [])
         };
 
         return new ScanResult.Success(new[] { self }.Concat(others).ToList());
@@ -83,6 +91,26 @@ public sealed class NetworkScanner(
             try
             {
                 results[ip] = await pingTimeMeasurer.MeasureAsync(ip, PingSamplesPerDevice, ct);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        });
+        await Task.WhenAll(tasks);
+        return results;
+    }
+
+    private async Task<IReadOnlyDictionary<IPAddress, IReadOnlyList<int>>> ScanPortsAsync(IReadOnlyList<IPAddress> ips, CancellationToken ct)
+    {
+        using var semaphore = new SemaphoreSlim(MaxPortScanConcurrency);
+        var results = new ConcurrentDictionary<IPAddress, IReadOnlyList<int>>();
+        var tasks = ips.Select(async ip =>
+        {
+            await semaphore.WaitAsync(ct);
+            try
+            {
+                results[ip] = await portScanner.ScanAsync(ip, ct);
             }
             finally
             {
